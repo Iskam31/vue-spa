@@ -10,7 +10,8 @@
     "strict": true,
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] },
-    "types": ["node"]
+    "types": ["node", "vite/client"],
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["src/**/*", "env.d.ts"]
 }
