@@ -1,9 +1,14 @@
 services:
-  web:
-    build: .
-    environment:
-      - VITE_API_HOST=http://109.73.206.144:6969
-      - VITE_API_KEY=E6kUTYrYwZq2tN4QEtyzsbEBk3ie
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vue-spa-front:latest
+    container_name: vue-spa-front
     ports:
-      - "80:80"
-    restart: unless-stopped
+      - "8080:80"
+    networks:
+      - app-network
+networks:
+  app-network:
+    driver: bridge
