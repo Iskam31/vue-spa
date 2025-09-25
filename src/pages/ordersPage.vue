@@ -30,7 +30,7 @@
 
         <filters-panel :fields="fields" @apply="onApply" />
         
-        <div style="display:flex;gap:12px;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:12px;align-items:flex-start;">
             <div style="flex:1;">
                 <line-chart :labels="chartLabels" :values="chartValues" :label="chartFieldLabel" />
             </div>
