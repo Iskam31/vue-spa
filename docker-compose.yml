@@ -1,7 +1,17 @@
 services:
   web:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
     environment:
+      - VITE_API_HOST=${VITE_API_HOST}
       - VITE_API_KEY=${VITE_API_KEY}
     ports:
       - "80:80"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
