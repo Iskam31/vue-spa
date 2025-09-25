@@ -62,18 +62,11 @@ import LineChart from '@/components/LineChart.vue'
 import type { GenericRecord } from '@/types/api'
 import { ElMessage } from 'element-plus'
 
-// Функция для получения сегодняшней даты в формате YYYY-MM-DD
 const getToday = () => {
     const today = new Date()
     return today.toISOString().split('T')[0]
 }
 
-// Функция для получения даты 7 дней назад в формате YYYY-MM-DD
-const getWeekAgo = () => {
-    const weekAgo = new Date()
-    weekAgo.setDate(weekAgo.getDate() - 7)
-    return weekAgo.toISOString().split('T')[0]
-}
 
 const rows = ref<GenericRecord[]>([])
 const loading = ref(false)
@@ -85,9 +78,9 @@ const filters = ref({ q: '', field: '' as string | null })
 const fields = ref<string[]>([])
 const chartField = ref<string | null>(null)
 
-// Даты по умолчанию - последние 7 дней
-const dateFrom = ref<string>(getWeekAgo())
+// Даты по умолчанию - с сегодняшней
 const dateTo = ref<string>(getToday())
+const dateFrom = dateTo
 
 onMounted(() => {
     fetchData()
