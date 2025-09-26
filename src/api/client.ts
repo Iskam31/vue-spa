@@ -1,20 +1,10 @@
 import axios from 'axios'
 
 const API_HOST = import.meta.env.VITE_API_HOST || 'http://109.73.206.144:6969'
-const API_KEY = import.meta.env.VITE_API_KEY || 'E6kUTYrYwZq2tN4QEtyzsbEBk3ie'
-
-console.log('API Host:', API_HOST)
-console.log('API Key:', API_KEY)
 
 const client = axios.create({
   baseURL: API_HOST,
   timeout: 15000
-})
-
-client.interceptors.request.use((config) => {
-  console.log('Making request to:', config.url)
-  console.log('Params:', config.params)
-  return config
 })
 
 client.interceptors.response.use((response) => {
