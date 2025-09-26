@@ -30,8 +30,13 @@ const emit = defineEmits(['update:page', 'update:perPage'])
 
 const displayColumns = computed(() => {
   if (!props.rows || props.rows.length === 0) return []
-  // show top-level keys (limit to 10 columns)
-  return Object.keys(props.rows[0]).slice(0, 10)
+  const allKeys = new Set<string>()
+  props.rows.forEach(item => {
+    Object.keys(item).forEach(key => {
+      allKeys.add(key)
+    })
+  })
+  return Array.from(allKeys)
 })
 
 function onPageChange(p: number) {
