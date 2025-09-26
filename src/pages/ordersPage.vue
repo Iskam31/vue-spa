@@ -1,6 +1,5 @@
 <template>
     <div>
-        <h1>Orders</h1>
         <el-card style="margin-bottom: 20px;">
             <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
                 <div>
@@ -28,8 +27,6 @@
             </div>
         </el-card>
 
-        <filters-panel :fields="fields" @apply="onApply" />
-        
         <div style="display:flex;flex-direction:column;gap:12px;align-items:flex-start;">
             <div style="flex:1;">
                 <line-chart :labels="chartLabels" :values="chartValues" :label="chartFieldLabel" />
@@ -56,7 +53,6 @@
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import client, { ApiResponse } from '@/api/client'
-import FiltersPanel from '@/components/FiltersPanel.vue'
 import DataTable from '@/components/DataTable.vue'
 import LineChart from '@/components/LineChart.vue'
 import type { GenericRecord } from '@/types/api'
