@@ -27,7 +27,7 @@
             </div>
         </el-card>
 
-        <div style="display:flex;flex-direction:column;gap:12px;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
             <div style="flex:1;">
                 <line-chart :labels="chartLabels" :values="chartValues" :label="chartFieldLabel" />
             </div>
