@@ -132,12 +132,9 @@ async function fetchData() {
         
         if (filters.value.q) params.q = filters.value.q
         if (filters.value.field) params.field = filters.value.field
-
-        console.log('Fetching data with params:', params)
         
         const resp = await client.get<ApiResponse<GenericRecord>>('/api/incomes', { params })
         
-        console.log('Sales API Response:', resp.data)
 
         if (resp.data) {
             rows.value = resp.data.data || []
@@ -146,7 +143,6 @@ async function fetchData() {
             
             if (rows.value.length > 0) {
                 fields.value = Object.keys(rows.value[0])
-                console.log('Available fields:', fields.value)
             }
             if (!chartField.value && fields.value.length > 0) {
                 chartField.value = fields.value.find(f => {
