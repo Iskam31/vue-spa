@@ -12,10 +12,11 @@
       :empty-text="emptyText"
       style="width: 100%"
       size="small"
+      @row-click="handleRowClick"
     >
       <el-table-column prop="nm_id" label="Артикул" width="120">
         <template #default="{ row }">
-          <span class="article-id">{{ row.nm_id }}</span>
+          <span class="article-id clickable">{{ row.nm_id }}</span>
         </template>
       </el-table-column>
       
@@ -37,7 +38,7 @@
             <span class="change-icon">
               {{ row.change > 0 ? '↑' : row.change < 0 ? '↓' : '→' }}
             </span>
-            {{ Math.abs(row.change) }}%
+            {{ Math.abs(row.change).toFixed(1) }}%
           </div>
         </template>
       </el-table-column>
@@ -64,6 +65,10 @@ withDefaults(defineProps<Props>(), {
   emptyText: 'Нет данных'
 })
 
+const emit = defineEmits<{
+  'row-click': [article: ArticleChange]
+}>()
+
 const formatNumber = (value: number): string => {
   if (value >= 1000000) {
     return (value / 1000000).toFixed(1) + 'M'
@@ -78,9 +83,16 @@ const getChangeClass = (change: number): string => {
   if (change < 0) return 'change-negative'
   return 'change-neutral'
 }
+
+const handleRowClick = (article: ArticleChange) => {
+  emit('row-click', article)
+}
 </script>
 
 <style scoped>
+.table-card {
+  margin-top: 20px;
+}
 
 .table-header {
   display: flex;
@@ -97,6 +109,15 @@ const getChangeClass = (change: number): string => {
   font-family: 'Courier New', monospace;
   font-weight: 600;
   color: #409EFF;
+}
+
+.article-id.clickable {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.article-id.clickable:hover {
+  color: #67a8ff;
 }
 
 .change-cell {
@@ -120,5 +141,13 @@ const getChangeClass = (change: number): string => {
 
 .change-neutral {
   color: #909399;
+}
+
+:deep(.el-table__row) {
+  cursor: pointer;
+}
+
+:deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
 }
 </style>

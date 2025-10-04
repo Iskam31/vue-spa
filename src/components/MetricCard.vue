@@ -1,5 +1,10 @@
 <template>
-    <el-card class="metric-card" :body-style="{ padding: '20px' }">
+    <el-card 
+        class="metric-card"
+        :body-style="{ padding: '20px' }"
+        :class="{ 'clickable': clickable }"
+        @click="handleClick"
+        >
         <div class="metric-header">
             <h3 class="metric-title">{{ title }}</h3>
             <el-tag :type="trendType" effect="plain">
@@ -15,6 +20,9 @@
         <div class="metric-chart">
             <LineChart :labels="chartLabels" :values="chartValues" :label="title" :height="120" />
         </div>
+        <div v-if="clickable" class="metric-footer">
+            <span class="click-hint">Нажмите для деталей →</span>
+        </div>
     </el-card>
 </template>
 
@@ -29,14 +37,22 @@ interface Props {
     periodLabel?: string
     chartLabels?: string[]
     chartValues?: number[]
+    metricType?: string
+    clickable?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
     trend: null,
     periodLabel: 'текущий период',
     chartLabels: () => [],
-    chartValues: () => []
+    chartValues: () => [],
+    metricType: '',
+    clickable: true
 })
+
+const emit = defineEmits<{
+  click: [metricType: string]
+}>()
 
 const formattedValue = computed(() => {
     if (props.value >= 1000000) {
@@ -51,16 +67,29 @@ const trendType = computed(() => {
     if (props.trend === null) return 'info'
     return props.trend > 0 ? 'success' : props.trend < 0 ? 'danger' : 'warning'
 })
+
+const handleClick = () => {
+  if (props.clickable && props.metricType) {
+    emit('click', props.metricType)
+  }
+}
 </script>
 
 <style scoped>
 .metric-card {
     height: 100%;
     transition: all 0.3s ease;
+    cursor: default;
 }
 
-.metric-card:hover {
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+.metric-card.clickable {
+    cursor: pointer;
+}
+
+.metric-card.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: #409EFF;
 }
 
 .metric-header {
@@ -90,5 +119,21 @@ const trendType = computed(() => {
 
 .metric-chart {
     height: 80px;
+}
+
+.metric-footer {
+    margin-top: 12px;
+    text-align: right;
+}
+
+.click-hint {
+    font-size: 12px;
+    color: #409EFF;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.metric-card.clickable:hover .click-hint {
+    opacity: 1;
 }
 </style>

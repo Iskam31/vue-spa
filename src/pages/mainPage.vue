@@ -73,6 +73,8 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailySales"
+        @click="goToMetricPage('sales')"
+        metric-type="sales"
       />
       
       <MetricCard
@@ -82,6 +84,8 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailyRevenue"
+        @click="goToMetricPage('revenue')"
+        metric-type="revenue"
       />
       
       <MetricCard
@@ -91,6 +95,8 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailyCancellations"
+        @click="goToMetricPage('cancellations')"
+        metric-type="cancellations"
       />
       
       <MetricCard
@@ -100,6 +106,8 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailyDiscounts"
+        @click="goToMetricPage('discounts')"
+        metric-type="discounts"
       />
     </div>
 
@@ -108,24 +116,28 @@
         title="Топ артикулов по продажам"
         :data="topSalesChanges"
         empty-text="Нет данных о продажах"
+        @row-click="goToArticleDetail"
       />
       
       <TopArticlesTable
         title="Топ артикулов по выручке"
         :data="topRevenueChanges"
         empty-text="Нет данных о выручке"
+        @row-click="goToArticleDetail"
       />
       
       <TopArticlesTable
         title="Топ артикулов по отменам"
         :data="topCancellationChanges"
         empty-text="Нет данных об отменах"
+        @row-click="goToArticleDetail"
       />
       
       <TopArticlesTable
         title="Топ артикулов по скидкам"
         :data="topDiscountChanges"
         empty-text="Нет данных о скидках"
+        @row-click="goToArticleDetail"
       />
     </div>
   </div>
@@ -133,6 +145,7 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchAllPages, fetchSinglePage } from '@/api/client'
 import type { GenericRecord } from '@/types/api'
@@ -146,6 +159,9 @@ interface Order extends GenericRecord {
   is_cancel: boolean
   date: string
   cancel_dt: string | null
+  brand: string
+  category: string
+  oblast: string
 }
 
 interface PeriodData {
@@ -259,6 +275,31 @@ const topSalesChanges = computed(() => calculateTopChanges('salesCount'))
 const topRevenueChanges = computed(() => calculateTopChanges('revenue'))
 const topCancellationChanges = computed(() => calculateTopChanges('cancellations'))
 const topDiscountChanges = computed(() => calculateTopChanges('avgDiscount'))
+
+// router методы навигации
+const router = useRouter()
+
+const goToMetricPage = (metricType: string) => {
+  router.push({
+    path: `/metric/${metricType}`,
+    query: {
+      dateFrom: currentDateFrom.value,
+      dateTo: currentDateTo.value
+    }
+  })
+}
+
+const goToArticleDetail = (article: any) => {
+  router.push({
+    path: `/article/${article.nm_id}`,
+    query: {
+      dateFrom: currentDateFrom.value,
+      dateTo: currentDateTo.value
+    }
+  })
+}
+
+
 
 function createEmptyPeriodData(): PeriodData {
   return {
