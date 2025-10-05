@@ -1,11 +1,12 @@
 <template>
   <div class="main-page">
-    <el-card style="margin-bottom: 20px;" >
-      <div style="display: flex; flex-direction: column; gap: 15px; align-items: start; flex-wrap: wrap;">
+    <!-- Фильтры периода -->
+    <el-card style="margin-bottom: 20px;">
+      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
         <div>
-          <span style="margin-right: 8px;">Период<br><br>с:</span>
+          <span style="margin-right: 8px;">Текущий период с:</span>
           <el-date-picker
-            v-model="currentDateFrom"
+            v-model="dateState.currentDateFrom"
             type="date"
             placeholder="Выберите дату"
             format="YYYY-MM-DD"
@@ -15,18 +16,17 @@
         <div>
           <span style="margin-right: 8px;">по:</span>
           <el-date-picker
-            v-model="currentDateTo"
+            v-model="dateState.currentDateTo"
             type="date"
             placeholder="Выберите дату"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
           />
         </div>
-        <div class="line-date"></div>
         <div>
-          <span style="margin-right: 8px;">с:</span>
+          <span style="margin-right: 8px;">Предыдущий период с:</span>
           <el-date-picker
-            v-model="previousDateFrom"
+            v-model="dateState.previousDateFrom"
             type="date"
             placeholder="Выберите дату"
             format="YYYY-MM-DD"
@@ -36,7 +36,7 @@
         <div>
           <span style="margin-right: 8px;">по:</span>
           <el-date-picker
-            v-model="previousDateTo"
+            v-model="dateState.previousDateTo"
             type="date"
             placeholder="Выберите дату"
             format="YYYY-MM-DD"
@@ -50,21 +50,30 @@
           Сбросить к неделе
         </el-button>
         
-        <!-- прогресс -->
-        <el-progress 
-          v-if="loading" 
-          :percentage="loadProgress" 
-          :show-text="false" 
-          style="width: 200px;"
-        />
+        <el-button @click="clearAllPageFilters" type="warning" plain>
+          Очистить все фильтры
+        </el-button>
       </div>
       
-      <!-- загрузка -->
-      <div v-if="loading" style="margin-top: 10px; font-size: 12px; color: #909399;">
-        {{ loadStatus }}
+      <!-- Показать активные фильтры -->
+      <div v-if="activeFiltersCount > 0" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0;">
+        <div style="font-size: 12px; color: #909399;">
+          Активные фильтры: {{ activeFiltersCount }}
+          <el-tag
+            v-for="filter in activeFilters"
+            :key="filter.key"
+            size="small"
+            closable
+            @close="clearFilter(filter.key)"
+            style="margin-left: 8px;"
+          >
+            {{ filter.label }}: {{ filter.value }}
+          </el-tag>
+        </div>
       </div>
     </el-card>
 
+    <!-- Метрики -->
     <div class="metrics-grid">
       <MetricCard
         title="Количество продаж"
@@ -73,8 +82,8 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailySales"
-        @click="goToMetricPage('sales')"
         metric-type="sales"
+        @click="goToMetricPage('sales')"
       />
       
       <MetricCard
@@ -84,8 +93,8 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailyRevenue"
-        @click="goToMetricPage('revenue')"
         metric-type="revenue"
+        @click="goToMetricPage('revenue')"
       />
       
       <MetricCard
@@ -95,8 +104,8 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailyCancellations"
-        @click="goToMetricPage('cancellations')"
         metric-type="cancellations"
+        @click="goToMetricPage('cancellations')"
       />
       
       <MetricCard
@@ -106,11 +115,12 @@
         period-label="текущий период"
         :chart-labels="chartLabels"
         :chart-values="dailyDiscounts"
-        @click="goToMetricPage('discounts')"
         metric-type="discounts"
+        @click="goToMetricPage('discounts')"
       />
     </div>
 
+    <!-- Таблицы с топом артикулов -->
     <div class="tables-grid">
       <TopArticlesTable
         title="Топ артикулов по продажам"
@@ -144,13 +154,14 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { fetchAllPages, fetchSinglePage } from '@/api/client'
+import client, { fetchAllPages } from '@/api/client'
 import type { GenericRecord } from '@/types/api'
 import MetricCard from '@/components/MetricCard.vue'
 import TopArticlesTable from '@/components/TopArticlesTable.vue'
+import { useFilters } from '@/composables/useFilters'
 
 interface Order extends GenericRecord {
   nm_id: number
@@ -197,17 +208,57 @@ interface ArticleChange {
   change: number
 }
 
+const router = useRouter()
 const loading = ref(false)
-const currentDateFrom = ref('')
-const currentDateTo = ref('')
-const previousDateFrom = ref('')
-const previousDateTo = ref('')
-const loadProgress = ref(0)
-const loadStatus = ref('')
+
+// Используем композабл для фильтров с переименованными методами
+const { 
+  filters: pageFilters, 
+  applyFilters: applyFiltersComposable, 
+  resetFilters: resetFiltersComposable 
+} = useFilters({
+  status: 'all'
+})
+
+// Используем reactive для дат чтобы обеспечить реактивность
+const dateState = reactive({
+  currentDateFrom: pageFilters.value.dateFrom || '',
+  currentDateTo: pageFilters.value.dateTo || '',
+  previousDateFrom: '',
+  previousDateTo: ''
+})
 
 const currentPeriodData = ref<PeriodData>(createEmptyPeriodData())
 const previousPeriodData = ref<PeriodData>(createEmptyPeriodData())
 
+// Navigation methods
+const goToMetricPage = (metricType: string) => {
+  router.push({
+    path: `/metric/${metricType}`,
+    query: {
+      dateFrom: dateState.currentDateFrom,
+      dateTo: dateState.currentDateTo,
+      region: pageFilters.value.region,
+      category: pageFilters.value.category,
+      brand: pageFilters.value.brand
+    }
+  })
+}
+
+const goToArticleDetail = (article: ArticleChange) => {
+  router.push({
+    path: `/article/${article.nm_id}`,
+    query: {
+      dateFrom: dateState.currentDateFrom,
+      dateTo: dateState.currentDateTo,
+      region: pageFilters.value.region,
+      category: pageFilters.value.category,
+      brand: pageFilters.value.brand
+    }
+  })
+}
+
+// Computed свойства
 const metrics = computed(() => {
   const current = currentPeriodData.value
   const previous = previousPeriodData.value
@@ -276,31 +327,34 @@ const topRevenueChanges = computed(() => calculateTopChanges('revenue'))
 const topCancellationChanges = computed(() => calculateTopChanges('cancellations'))
 const topDiscountChanges = computed(() => calculateTopChanges('avgDiscount'))
 
-// router методы навигации
-const router = useRouter()
-
-const goToMetricPage = (metricType: string) => {
-  router.push({
-    path: `/metric/${metricType}`,
-    query: {
-      dateFrom: currentDateFrom.value,
-      dateTo: currentDateTo.value
+// Computed для активных фильтров
+const activeFilters = computed(() => {
+  const active: Array<{ key: string; label: string; value: string }> = []
+  
+  const filterLabels: { [key: string]: string } = {
+    region: 'Регион',
+    category: 'Категория', 
+    brand: 'Бренд',
+    article: 'Артикул',
+    status: 'Статус'
+  }
+  
+  Object.keys(filterLabels).forEach(key => {
+    if (pageFilters.value[key] && pageFilters.value[key] !== 'all') {
+      active.push({
+        key,
+        label: filterLabels[key],
+        value: pageFilters.value[key]
+      })
     }
   })
-}
+  
+  return active
+})
 
-const goToArticleDetail = (article: any) => {
-  router.push({
-    path: `/article/${article.nm_id}`,
-    query: {
-      dateFrom: currentDateFrom.value,
-      dateTo: currentDateTo.value
-    }
-  })
-}
+const activeFiltersCount = computed(() => activeFilters.value.length)
 
-
-
+// Methods
 function createEmptyPeriodData(): PeriodData {
   return {
     salesCount: 0,
@@ -339,50 +393,31 @@ function getDefaultDates() {
 
 function resetToDefaultPeriod() {
   const dates = getDefaultDates()
-  currentDateFrom.value = dates.currentFrom
-  currentDateTo.value = dates.currentTo
-  previousDateFrom.value = dates.previousFrom
-  previousDateTo.value = dates.previousTo
+  dateState.currentDateFrom = dates.currentFrom
+  dateState.currentDateTo = dates.currentTo
+  dateState.previousDateFrom = dates.previousFrom
+  dateState.previousDateTo = dates.previousTo
+  
+  resetFiltersComposable({
+    dateFrom: dates.currentFrom,
+    dateTo: dates.currentTo
+  })
+  
   loadData()
 }
 
 async function fetchOrdersForPeriod(dateFrom: string, dateTo: string, periodName: string): Promise<Order[]> {
   try {
-    loadStatus.value = `Загрузка ${periodName} периода...`
-
     const allOrders = await fetchAllPages<Order>('/api/orders', {
       dateFrom,
       dateTo
-    }, 5, 500)
-    
-    loadProgress.value += 25
-    loadStatus.value = `${periodName} период загружен: ${allOrders.length} записей`
+    }, 2, 1500)
     
     return allOrders
   } catch (error: any) {
     console.error('Error fetching orders:', error)
-    
-    if (error.response?.status === 429) {
-      ElMessage.warning('Слишком много запросов. Пожалуйста, подождите...')
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      loadStatus.value = `Повторная попытка загрузки ${periodName} периода...`
-      
-      try {
-        const singlePageOrders = await fetchSinglePage<Order>('/api/orders', {
-          dateFrom,
-          dateTo
-        })
-        loadProgress.value += 25
-        loadStatus.value = `${periodName} период загружен (ограничено): ${singlePageOrders.length} записей`
-        return singlePageOrders
-      } catch (retryError) {
-        ElMessage.error(`Ошибка при загрузке данных за ${periodName} период`)
-        return []
-      }
-    } else {
-      ElMessage.error(`Ошибка при загрузке данных за ${periodName} период`)
-      return []
-    }
+    ElMessage.error(`Ошибка при загрузке данных за период ${dateFrom} - ${dateTo}`)
+    return []
   }
 }
 
@@ -392,7 +427,7 @@ function processOrders(orders: Order[]): PeriodData {
   orders.forEach(order => {
     const date = order.date.split(' ')[0]
     const nmId = order.nm_id
-    const totalPrice = parseFloat(order.total_price) || 0
+    const totalPrice = parseFloat(order.total_price || '0')
     const isCancel = order.is_cancel || order.cancel_dt !== null
     
     if (!data.daily[date]) {
@@ -492,66 +527,67 @@ function calculateTopChanges(metric: 'salesCount' | 'revenue' | 'cancellations' 
 }
 
 async function loadData() {
-  if (!currentDateFrom.value || !currentDateTo.value || !previousDateFrom.value || !previousDateTo.value) {
+  if (!dateState.currentDateFrom || !dateState.currentDateTo || !dateState.previousDateFrom || !dateState.previousDateTo) {
     ElMessage.warning('Выберите оба периода')
     return
   }
   
-  if (currentDateFrom.value > currentDateTo.value) {
+  if (dateState.currentDateFrom > dateState.currentDateTo) {
     ElMessage.warning('Дата "с" не может быть больше даты "по" в текущем периоде')
     return
   }
   
-  if (previousDateFrom.value > previousDateTo.value) {
+  if (dateState.previousDateFrom > dateState.previousDateTo) {
     ElMessage.warning('Дата "с" не может быть больше даты "по" в предыдущем периоде')
     return
   }
   
   loading.value = true
-  loadProgress.value = 0
-  loadStatus.value = 'Начало загрузки данных...'
   
   try {
-    loadStatus.value = 'Загрузка текущего периода...'
-    const currentOrders = await fetchOrdersForPeriod(
-      currentDateFrom.value, 
-      currentDateTo.value, 
-      'текущий'
-    )
+    const [currentOrders, previousOrders] = await Promise.all([
+      fetchOrdersForPeriod(dateState.currentDateFrom, dateState.currentDateTo, 'текущий'),
+      fetchOrdersForPeriod(dateState.previousDateFrom, dateState.previousDateTo, 'предыдущий')
+    ])
     
-    loadStatus.value = 'Загрузка предыдущего периода...'
-    const previousOrders = await fetchOrdersForPeriod(
-      previousDateFrom.value, 
-      previousDateTo.value, 
-      'предыдущий'
-    )
-    
-    loadStatus.value = 'Обработка данных...'
     currentPeriodData.value = processOrders(currentOrders)
     previousPeriodData.value = processOrders(previousOrders)
     
-    loadProgress.value = 100
-    loadStatus.value = 'Готово'
-    
     ElMessage.success(`Данные загружены: ${currentOrders.length} записей (текущий), ${previousOrders.length} записей (предыдущий)`)
-    
-    setTimeout(() => {
-      if (loadStatus.value === 'Готово') {
-        loadStatus.value = ''
-      }
-    }, 3000)
-    
   } catch (error: any) {
     console.error('Error loading data:', error)
     ElMessage.error('Ошибка при загрузке данных')
-    loadStatus.value = 'Ошибка загрузки'
   } finally {
     loading.value = false
   }
 }
 
+// Методы для управления фильтрами
+const clearFilter = (filterKey: string) => {
+  pageFilters.value[filterKey] = filterKey === 'status' ? 'all' : ''
+}
+
+const clearAllPageFilters = () => {
+  resetFiltersComposable({
+    dateFrom: pageFilters.value.dateFrom,
+    dateTo: pageFilters.value.dateTo
+  })
+}
+
+// Следим за изменениями дат и сохраняем в фильтры
+watch(() => [dateState.currentDateFrom, dateState.currentDateTo], () => {
+  pageFilters.value.dateFrom = dateState.currentDateFrom
+  pageFilters.value.dateTo = dateState.currentDateTo
+})
+
+// Lifecycle
 onMounted(() => {
-  resetToDefaultPeriod()
+  // Если даты не установлены, устанавливаем по умолчанию
+  if (!dateState.currentDateFrom || !dateState.currentDateTo) {
+    resetToDefaultPeriod()
+  } else {
+    loadData()
+  }
 })
 </script>
 
@@ -562,28 +598,22 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.line-date {
-    width: 100%;
-    height: 2px;
-   background: rgb(210, 210, 210);
-}
-
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 5px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
   margin-bottom: 20px;
 }
 
 .tables-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 5px;
+  gap: 16px;
 }
 
 @media (max-width: 1200px) {
   .metrics-grid {
-    grid-template-columns: repeat(1, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
   
   .tables-grid {

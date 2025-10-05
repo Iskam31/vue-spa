@@ -97,7 +97,7 @@ export async function fetchSinglePage<T>(
   const requestParams = {
     ...params,
     key: "E6kUTYrYwZq2tN4QEtyzsbEBk3ie",
-    limit: 100
+    limit: 1000
   }
 
   try {

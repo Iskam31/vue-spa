@@ -5,7 +5,7 @@
         <div>
           <h2 style="margin: 0; color: #303133;">{{ pageTitle }}</h2>
           <div style="color: #909399; font-size: 14px; margin-top: 4px;">
-            Период: {{ dateFrom }} - {{ dateTo }}
+            Период: {{ dateState.dateFrom }} - {{ dateState.dateTo }}
           </div>
         </div>
         
@@ -13,16 +13,20 @@
           <el-button @click="$router.back()">
             ← Назад
           </el-button>
+          <el-button type="primary" @click="exportData">
+            Экспорт
+          </el-button>
         </div>
       </div>
     </el-card>
 
+    <!-- Фильтры -->
     <el-card style="margin-bottom: 20px;">
       <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
         <div>
           <span style="margin-right: 8px;">Дата с:</span>
           <el-date-picker
-            v-model="dateFrom"
+            v-model="dateState.dateFrom"
             type="date"
             placeholder="Выберите дату"
             format="YYYY-MM-DD"
@@ -32,7 +36,7 @@
         <div>
           <span style="margin-right: 8px;">по:</span>
           <el-date-picker
-            v-model="dateTo"
+            v-model="dateState.dateTo"
             type="date"
             placeholder="Выберите дату"
             format="YYYY-MM-DD"
@@ -40,7 +44,7 @@
           />
         </div>
         
-        <el-select v-model="filters.article" placeholder="Артикул" clearable style="width: 150px;">
+        <el-select v-model="pageFilters.article" placeholder="Артикул" clearable style="width: 150px;">
           <el-option
             v-for="article in uniqueArticles"
             :key="article"
@@ -49,7 +53,7 @@
           />
         </el-select>
         
-        <el-select v-model="filters.region" placeholder="Регион" clearable style="width: 180px;">
+        <el-select v-model="pageFilters.region" placeholder="Регион" clearable style="width: 180px;">
           <el-option
             v-for="region in uniqueRegions"
             :key="region"
@@ -58,7 +62,7 @@
           />
         </el-select>
         
-        <el-select v-model="filters.category" placeholder="Категория" clearable style="width: 180px;">
+        <el-select v-model="pageFilters.category" placeholder="Категория" clearable style="width: 180px;">
           <el-option
             v-for="category in uniqueCategories"
             :key="category"
@@ -67,7 +71,7 @@
           />
         </el-select>
         
-        <el-select v-model="filters.brand" placeholder="Бренд" clearable style="width: 150px;">
+        <el-select v-model="pageFilters.brand" placeholder="Бренд" clearable style="width: 150px;">
           <el-option
             v-for="brand in uniqueBrands"
             :key="brand"
@@ -76,15 +80,16 @@
           />
         </el-select>
         
-        <el-button type="primary" @click="applyFilters">
+        <el-button type="primary" @click="applyPageFilters">
           Применить
         </el-button>
-        <el-button @click="resetFilters">
+        <el-button @click="resetPageFilters">
           Сбросить
         </el-button>
       </div>
     </el-card>
 
+    <!-- График -->
     <el-card style="margin-bottom: 20px;">
       <template #header>
         <span style="font-weight: 600;">Динамика {{ metricTitle }}</span>
@@ -97,6 +102,7 @@
       />
     </el-card>
 
+    <!-- Таблица -->
     <el-card>
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -139,7 +145,7 @@
         
         <el-table-column prop="total_price" label="Сумма" align="right" width="120">
           <template #default="{ row }">
-            {{ parseFloat(row.total_price || 0).toLocaleString('ru-RU') }} ₽
+            {{ parseFloat(row.total_price || '0').toLocaleString('ru-RU') }} ₽
           </template>
         </el-table-column>
         
@@ -164,6 +170,7 @@
         </el-table-column>
       </el-table>
 
+      <!-- Пагинация -->
       <div style="display: flex; justify-content: center; margin-top: 20px;">
         <el-pagination
           v-model:current-page="currentPage"
@@ -184,6 +191,7 @@ import { ElMessage } from 'element-plus'
 import client from '@/api/client'
 import type { GenericRecord } from '@/types/api'
 import LineChart from '@/components/LineChart.vue'
+import { useFilters } from '@/composables/useFilters'
 
 interface Order extends GenericRecord {
   nm_id: number
@@ -201,23 +209,29 @@ interface Order extends GenericRecord {
 const route = useRoute()
 const router = useRouter()
 
+// Используем композабл для фильтров с переименованными методами
+const { 
+  filters: pageFilters, 
+  applyFilters: applyFiltersComposable, 
+  resetFilters: resetFiltersComposable 
+} = useFilters({
+  status: 'all'
+})
+
+// Reactive data
 const loading = ref(false)
 const orders = ref<Order[]>([])
-const dateFrom = ref('')
-const dateTo = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
 
-const filters = ref({
-  article: '',
-  region: '',
-  category: '',
-  brand: ''
-})
+// Используем reactive для дат чтобы избежать проблем с ref
+const dateState = {
+  dateFrom: pageFilters.value.dateFrom,
+  dateTo: pageFilters.value.dateTo
+}
 
-// computed
+// Computed
 const metricType = computed(() => route.params.metricType as string)
-const metricId = computed(() => route.params.id as string)
 
 const pageTitle = computed(() => {
   const titles: { [key: string]: string } = {
@@ -238,23 +252,23 @@ const uniqueArticles = computed(() => {
 })
 
 const uniqueRegions = computed(() => {
-  return [...new Set(orders.value.map(item => item.oblast).filter(Boolean))].sort()
+  return [...new Set(orders.value.map(item => item.oblast || '').filter(Boolean))].sort()
 })
 
 const uniqueCategories = computed(() => {
-  return [...new Set(orders.value.map(item => item.category).filter(Boolean))].sort()
+  return [...new Set(orders.value.map(item => item.category || '').filter(Boolean))].sort()
 })
 
 const uniqueBrands = computed(() => {
-  return [...new Set(orders.value.map(item => item.brand).filter(Boolean))].sort()
+  return [...new Set(orders.value.map(item => item.brand || '').filter(Boolean))].sort()
 })
 
 const filteredData = computed(() => {
   return orders.value.filter(order => {
-    if (filters.value.article && order.nm_id.toString() !== filters.value.article) return false
-    if (filters.value.region && order.oblast !== filters.value.region) return false
-    if (filters.value.category && order.category !== filters.value.category) return false
-    if (filters.value.brand && order.brand !== filters.value.brand) return false
+    if (pageFilters.value.article && order.nm_id.toString() !== pageFilters.value.article) return false
+    if (pageFilters.value.region && order.oblast !== pageFilters.value.region) return false
+    if (pageFilters.value.category && order.category !== pageFilters.value.category) return false
+    if (pageFilters.value.brand && order.brand !== pageFilters.value.brand) return false
     return true
   })
 })
@@ -303,18 +317,27 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('ru-RU')
 }
 
-const applyFilters = () => {
+// Переименовываем методы чтобы избежать конфликта имен
+const applyPageFilters = () => {
   currentPage.value = 1
   loadData()
 }
 
-const resetFilters = () => {
-  filters.value = {
+const resetPageFilters = () => {
+  // Сбрасываем только фильтры кроме дат
+  const currentDateFrom = pageFilters.value.dateFrom
+  const currentDateTo = pageFilters.value.dateTo
+  
+  resetFiltersComposable({
+    dateFrom: currentDateFrom,
+    dateTo: currentDateTo,
     article: '',
     region: '',
     category: '',
-    brand: ''
-  }
+    brand: '',
+    status: 'all'
+  })
+  
   currentPage.value = 1
   loadData()
 }
@@ -323,19 +346,25 @@ const goToArticleDetail = (order: Order) => {
   router.push({
     path: `/article/${order.nm_id}`,
     query: {
-      dateFrom: dateFrom.value,
-      dateTo: dateTo.value
+      dateFrom: dateState.dateFrom,
+      dateTo: dateState.dateTo,
+      region: pageFilters.value.region,
+      category: pageFilters.value.category,
+      brand: pageFilters.value.brand
     }
   })
 }
 
+const exportData = () => {
+  ElMessage.info('Функция экспорта в разработке')
+}
 
 async function loadData() {
   loading.value = true
   try {
     const params: any = {
-      dateFrom: dateFrom.value,
-      dateTo: dateTo.value,
+      dateFrom: dateState.dateFrom,
+      dateTo: dateState.dateTo,
       key: "E6kUTYrYwZq2tN4QEtyzsbEBk3ie",
       limit: 500
     }
@@ -343,9 +372,6 @@ async function loadData() {
     const resp = await client.get('/api/orders', { params })
     orders.value = resp.data.data || []
     
-    console.log(resp);
-    
-
     ElMessage.success(`Загружено ${orders.value.length} записей`)
   } catch (error: any) {
     console.error('Error loading metric data:', error)
@@ -355,27 +381,47 @@ async function loadData() {
   }
 }
 
+// Следим за изменениями дат в фильтрах
+watch(() => pageFilters.value.dateFrom, (newVal: string) => {
+  dateState.dateFrom = newVal
+})
+
+watch(() => pageFilters.value.dateTo, (newVal: string) => {
+  dateState.dateTo = newVal
+})
+
+// Lifecycle
 onMounted(() => {
-  dateFrom.value = (route.query.dateFrom as string) || getWeekAgo()
-  dateTo.value = (route.query.dateTo as string) || getToday()
+  // Устанавливаем даты из фильтров или по умолчанию
+  if (!dateState.dateFrom || !dateState.dateTo) {
+    const defaultDates = getDefaultDates()
+    dateState.dateFrom = defaultDates.currentFrom
+    dateState.dateTo = defaultDates.currentTo
+    pageFilters.value.dateFrom = defaultDates.currentFrom
+    pageFilters.value.dateTo = defaultDates.currentTo
+  }
   
   loadData()
 })
 
-watch([dateFrom, dateTo], () => {
+// Загружаем данные при изменении дат
+watch([() => dateState.dateFrom, () => dateState.dateTo], () => {
   currentPage.value = 1
   loadData()
 })
 
-function getToday() {
+function getDefaultDates() {
   const today = new Date()
-  return today.toISOString().split('T')[0]
-}
-
-function getWeekAgo() {
-  const weekAgo = new Date()
-  weekAgo.setDate(weekAgo.getDate() - 7)
-  return weekAgo.toISOString().split('T')[0]
+  const currentTo = today.toISOString().split('T')[0]
+  
+  const currentFrom = new Date(today)
+  currentFrom.setDate(today.getDate() - 7)
+  const currentFromStr = currentFrom.toISOString().split('T')[0]
+  
+  return {
+    currentFrom: currentFromStr,
+    currentTo: currentTo
+  }
 }
 </script>
 

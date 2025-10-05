@@ -1,5 +1,6 @@
 <template>
   <div class="article-page">
+
     <el-card style="margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px;">
         <div>
@@ -100,10 +101,10 @@
           <el-option label="Все" value="all" />
         </el-select>
         
-        <el-button type="primary" @click="applyFilters">
+        <el-button type="primary" @click="applyPageFilters">
           Применить
         </el-button>
-        <el-button @click="resetFilters">
+        <el-button @click="resetPageFilters">
           Сбросить
         </el-button>
       </div>
@@ -158,7 +159,7 @@
         
         <el-table-column prop="total_price" label="Сумма" align="right" width="120" sortable>
           <template #default="{ row }">
-            {{ parseFloat(row.total_price || 0).toLocaleString('ru-RU') }} ₽
+            {{ parseFloat(row.total_price || '0').toLocaleString('ru-RU') }} ₽
           </template>
         </el-table-column>
         
@@ -249,6 +250,7 @@ import { ElMessage } from 'element-plus'
 import client from '@/api/client'
 import type { GenericRecord } from '@/types/api'
 import LineChart from '@/components/LineChart.vue'
+import { useFilters } from '@/composables/useFilters'
 
 interface Order extends GenericRecord {
   nm_id: number
@@ -276,20 +278,20 @@ interface RegionStat {
 
 const route = useRoute()
 
-const loading = ref(false)
-const orders = ref<Order[]>([])
-const dateFrom = ref('')
-const dateTo = ref('')
-const currentPage = ref(1)
-const pageSize = ref(20)
-
-const filters = ref({
-  region: '',
-  category: '',
-  brand: '',
+// Используем композабл для фильтров с переименованными методами
+const { filters, applyFilters: applyFiltersComposable, resetFilters: resetFiltersComposable } = useFilters({
   status: 'all'
 })
 
+const loading = ref<boolean>(false)
+const orders = ref<Order[]>([])
+const currentPage = ref<number>(1)
+const pageSize = ref<number>(20)
+
+const dateFrom = ref<string>(filters.value.dateFrom as string)
+const dateTo = ref<string>(filters.value.dateTo as string)
+
+// Computed
 const articleId = computed(() => route.params.id as string)
 
 const filteredData = computed(() => {
@@ -332,15 +334,15 @@ const avgDiscount = computed(() => {
 })
 
 const uniqueRegions = computed(() => {
-  return [...new Set(orders.value.map(item => item.oblast).filter(Boolean))].sort()
+  return [...new Set(orders.value.map(item => item.oblast || '').filter(Boolean))].sort()
 })
 
 const uniqueCategories = computed(() => {
-  return [...new Set(orders.value.map(item => item.category).filter(Boolean))].sort()
+  return [...new Set(orders.value.map(item => item.category || '').filter(Boolean))].sort()
 })
 
 const uniqueBrands = computed(() => {
-  return [...new Set(orders.value.map(item => item.brand).filter(Boolean))].sort()
+  return [...new Set(orders.value.map(item => item.brand || '').filter(Boolean))].sort()
 })
 
 const salesChartLabels = computed(() => {
@@ -372,7 +374,7 @@ const revenueChartValues = computed(() => {
 })
 
 const regionStats = computed(() => {
-  const regions = [...new Set(filteredData.value.map(item => item.oblast).filter(Boolean))]
+  const regions = [...new Set(filteredData.value.map(item => item.oblast || '').filter(Boolean))]
   
   return regions.map(region => {
     const regionOrders = filteredData.value.filter(order => order.oblast === region)
@@ -387,21 +389,28 @@ const regionStats = computed(() => {
   }).sort((a, b) => b.revenue - a.revenue)
 })
 
+// Methods
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('ru-RU')
 }
 
-const applyFilters = () => {
+const applyPageFilters = () => {
   currentPage.value = 1
 }
 
-const resetFilters = () => {
-  filters.value = {
+const resetPageFilters = () => {
+  const currentDateFrom = filters.value.dateFrom
+  const currentDateTo = filters.value.dateTo
+  
+  resetFiltersComposable({
+    dateFrom: currentDateFrom,
+    dateTo: currentDateTo,
     region: '',
     category: '',
     brand: '',
     status: 'all'
-  }
+  })
+  
   currentPage.value = 1
 }
 
@@ -416,7 +425,7 @@ async function loadData() {
       dateFrom: dateFrom.value,
       dateTo: dateTo.value,
       key: "E6kUTYrYwZq2tN4QEtyzsbEBk3ie",
-      limit: 1000
+      limit: 500
     }
 
     const resp = await client.get('/api/orders', { params })
@@ -433,9 +442,23 @@ async function loadData() {
   }
 }
 
+watch(() => filters.value.dateFrom, (newVal: string) => {
+  dateFrom.value = newVal
+})
+
+watch(() => filters.value.dateTo, (newVal: string) => {
+  dateTo.value = newVal
+})
+
+// Lifecycle
 onMounted(() => {
-  dateFrom.value = (route.query.dateFrom as string) || getWeekAgo()
-  dateTo.value = (route.query.dateTo as string) || getToday()
+  if (!dateFrom.value || !dateTo.value) {
+    const defaultDates = getDefaultDates()
+    dateFrom.value = defaultDates.currentFrom
+    dateTo.value = defaultDates.currentTo
+    filters.value.dateFrom = defaultDates.currentFrom
+    filters.value.dateTo = defaultDates.currentTo
+  }
   
   loadData()
 })
@@ -454,6 +477,20 @@ function getWeekAgo() {
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
   return weekAgo.toISOString().split('T')[0]
+}
+
+function getDefaultDates() {
+  const today = new Date()
+  const currentTo = today.toISOString().split('T')[0]
+  
+  const currentFrom = new Date(today)
+  currentFrom.setDate(today.getDate() - 7)
+  const currentFromStr = currentFrom.toISOString().split('T')[0]
+  
+  return {
+    currentFrom: currentFromStr,
+    currentTo: currentTo
+  }
 }
 </script>
 
