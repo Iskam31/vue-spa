@@ -1,256 +1,162 @@
 <template>
   <div class="article-page">
-
     <el-card style="margin-bottom: 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 15px;">
-        <div>
-          <h1 style="margin: 0 0 8px 0; color: #303133;">
-            Артикул: <span class="article-id">{{ articleId }}</span>
-          </h1>
-          <div style="color: #909399; font-size: 14px;">
-            Детальная статистика по товару
+      <el-breadcrumb separator="/">
+        <el-breadcrumb-item :to="{ path: '/main' }">Главная</el-breadcrumb-item>
+        <el-breadcrumb-item>Артикул {{ articleId }}</el-breadcrumb-item>
+      </el-breadcrumb>
+    </el-card>
+
+    <div class="article-layout">
+      <div class="article-sidebar">
+        <el-card class="product-card">
+          <div class="product-image">
+            <div class="image-placeholder">
+              <el-icon size="64" color="#909399"><Picture /></el-icon>
+              <span class="placeholder-text">Изображение товара</span>
+            </div>
           </div>
-        </div>
-        
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-          <el-button @click="$router.back()">
-            ← Назад
-          </el-button>
-          <el-button type="primary" @click="exportData">
-            Экспорт
-          </el-button>
-        </div>
-      </div>
-    </el-card>
 
-    <div class="metrics-grid" style="margin-bottom: 20px;">
-      <el-card class="metric-item">
-        <div class="metric-value">{{ totalSales }}</div>
-        <div class="metric-label">Всего продаж</div>
-      </el-card>
-      
-      <el-card class="metric-item">
-        <div class="metric-value">{{ totalRevenue.toLocaleString('ru-RU') }} ₽</div>
-        <div class="metric-label">Общая выручка</div>
-      </el-card>
-      
-      <el-card class="metric-item">
-        <div class="metric-value">{{ totalCancellations }}</div>
-        <div class="metric-label">Отмены</div>
-      </el-card>
-      
-      <el-card class="metric-item">
-        <div class="metric-value">{{ avgDiscount }}%</div>
-        <div class="metric-label">Средняя скидка</div>
-      </el-card>
+          <div class="product-info">
+            <h2 class="product-title">Артикул {{ articleId }}</h2>
+            
+            <div class="info-section">
+              <h3>Основная информация</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Бренд:</span>
+                  <span class="info-value">{{ productInfo.brand || 'Не указан' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Категория:</span>
+                  <span class="info-value">{{ productInfo.category || 'Не указана' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Артикул поставщика:</span>
+                  <span class="info-value">{{ productInfo.supplierArticle || 'Не указан' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Размер:</span>
+                  <span class="info-value">{{ productInfo.techSize || 'Не указан' }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Штрихкод:</span>
+                  <span class="info-value">{{ productInfo.barcode || 'Не указан' }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="info-section">
+              <h3>Общая статистика</h3>
+              <div class="stats-grid">
+                <div class="stat-item">
+                  <div class="stat-value">{{ totalSales }}</div>
+                  <div class="stat-label">Продажи</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ totalRevenue.toLocaleString('ru-RU') }} ₽</div>
+                  <div class="stat-label">Выручка</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ totalCancellations }}</div>
+                  <div class="stat-label">Отмены</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ avgDiscount }}%</div>
+                  <div class="stat-label">Скидка</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </div>
+
+      <div class="article-content">
+        <el-card style="margin-bottom: 20px;">
+          <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+            <div>
+              <span style="margin-right: 8px;">Период с:</span>
+              <el-date-picker
+                v-model="dateState.dateFrom"
+                type="date"
+                placeholder="Выберите дату"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                @change="loadData"
+              />
+            </div>
+            <div>
+              <span style="margin-right: 8px;">по:</span>
+              <el-date-picker
+                v-model="dateState.dateTo"
+                type="date"
+                placeholder="Выберите дату"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                @change="loadData"
+              />
+            </div>
+            
+            <el-button type="primary" @click="loadData">
+              Обновить
+            </el-button>
+          </div>
+        </el-card>
+
+        <el-card>
+          <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600;">Показатели по дням</span>
+              <span style="color: #909399; font-size: 14px;">
+                Период: {{ dateState.dateFrom }} - {{ dateState.dateTo }}
+              </span>
+            </div>
+          </template>
+          
+          <el-table 
+            :data="metricsTableData" 
+            v-loading="loading"
+            style="width: 100%"
+            :default-sort="{ prop: 'metric', order: 'ascending' }"
+          >
+            <el-table-column 
+              prop="metric" 
+              label="Показатель" 
+              width="200"
+              fixed
+            >
+              <template #default="{ row }">
+                <span class="metric-name">{{ row.metric }}</span>
+              </template>
+            </el-table-column>
+            
+            <el-table-column 
+              v-for="date in tableDates" 
+              :key="date"
+              :label="formatTableDate(date)"
+              align="right"
+              width="120"
+            >
+              <template #default="{ row }">
+                <div class="metric-value">
+                  {{ formatMetricValue(row.metric, row[date]) }}
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </div>
     </div>
-
-    <el-card style="margin-bottom: 20px;">
-      <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-        <div>
-          <span style="margin-right: 8px;">Дата с:</span>
-          <el-date-picker
-            v-model="dateFrom"
-            type="date"
-            placeholder="Выберите дату"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-          />
-        </div>
-        <div>
-          <span style="margin-right: 8px;">по:</span>
-          <el-date-picker
-            v-model="dateTo"
-            type="date"
-            placeholder="Выберите дату"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-          />
-        </div>
-        
-        <el-select v-model="filters.region" placeholder="Регион" clearable style="width: 180px;">
-          <el-option
-            v-for="region in uniqueRegions"
-            :key="region"
-            :label="region"
-            :value="region"
-          />
-        </el-select>
-        
-        <el-select v-model="filters.category" placeholder="Категория" clearable style="width: 180px;">
-          <el-option
-            v-for="category in uniqueCategories"
-            :key="category"
-            :label="category"
-            :value="category"
-          />
-        </el-select>
-        
-        <el-select v-model="filters.brand" placeholder="Бренд" clearable style="width: 150px;">
-          <el-option
-            v-for="brand in uniqueBrands"
-            :key="brand"
-            :label="brand"
-            :value="brand"
-          />
-        </el-select>
-
-        <el-select v-model="filters.status" placeholder="Статус" clearable style="width: 130px;">
-          <el-option label="Успешные" value="success" />
-          <el-option label="Отмены" value="cancelled" />
-          <el-option label="Все" value="all" />
-        </el-select>
-        
-        <el-button type="primary" @click="applyPageFilters">
-          Применить
-        </el-button>
-        <el-button @click="resetPageFilters">
-          Сбросить
-        </el-button>
-      </div>
-    </el-card>
-
-    <div class="charts-grid" style="margin-bottom: 20px;">
-      <el-card>
-        <template #header>
-          <span style="font-weight: 600;">Динамика продаж</span>
-        </template>
-        <LineChart 
-          :labels="salesChartLabels" 
-          :values="salesChartValues" 
-          label="Количество продаж"
-          :height="200"
-        />
-      </el-card>
-      
-      <el-card>
-        <template #header>
-          <span style="font-weight: 600;">Динамика выручки</span>
-        </template>
-        <LineChart 
-          :labels="revenueChartLabels" 
-          :values="revenueChartValues" 
-          label="Выручка, ₽"
-          :height="200"
-        />
-      </el-card>
-    </div>
-
-    <el-card>
-      <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-weight: 600;">Детальная информация по заказам</span>
-          <span style="color: #909399; font-size: 14px;">
-            Всего записей: {{ filteredData.length }}
-          </span>
-        </div>
-      </template>
-      
-      <el-table 
-        :data="paginatedData" 
-        v-loading="loading"
-        style="width: 100%"
-      >
-        <el-table-column prop="date" label="Дата" width="140" sortable>
-          <template #default="{ row }">
-            {{ formatDate(row.date) }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="total_price" label="Сумма" align="right" width="120" sortable>
-          <template #default="{ row }">
-            {{ parseFloat(row.total_price || '0').toLocaleString('ru-RU') }} ₽
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="discount_percent" label="Скидка" align="right" width="100" sortable>
-          <template #default="{ row }">
-            {{ row.discount_percent || 0 }}%
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="brand" label="Бренд" width="150" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.brand || '—' }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="category" label="Категория" width="180" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.category || '—' }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="oblast" label="Регион" width="150" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.oblast || '—' }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="warehouse_name" label="Склад" width="150" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.warehouse_name || '—' }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="is_cancel" label="Статус" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.is_cancel ? 'danger' : 'success'" size="small">
-              {{ row.is_cancel ? 'Отмена' : 'Успешно' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="supplier_article" label="Артикул поставщика" width="160" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.supplier_article || '—' }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="tech_size" label="Размер" width="120" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.tech_size || '—' }}
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div style="display: flex; justify-content: center; margin-top: 20px;">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="filteredData.length"
-          :page-sizes="[10, 20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-        />
-      </div>
-    </el-card>
-
-    <el-card style="margin-top: 20px;">
-      <template #header>
-        <span style="font-weight: 600;">Статистика по регионам</span>
-      </template>
-      <el-table :data="regionStats" style="width: 100%">
-        <el-table-column prop="region" label="Регион" />
-        <el-table-column prop="sales" label="Продажи" align="right" />
-        <el-table-column prop="revenue" label="Выручка" align="right">
-          <template #default="{ row }">
-            {{ row.revenue.toLocaleString('ru-RU') }} ₽
-          </template>
-        </el-table-column>
-        <el-table-column prop="cancellations" label="Отмены" align="right" />
-      </el-table>
-    </el-card>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Picture } from '@element-plus/icons-vue'
 import client from '@/api/client'
 import type { GenericRecord } from '@/types/api'
-import LineChart from '@/components/LineChart.vue'
-import { useFilters } from '@/composables/useFilters'
 
 interface Order extends GenericRecord {
   nm_id: number
@@ -266,164 +172,205 @@ interface Order extends GenericRecord {
   supplier_article: string
   tech_size: string
   barcode: string
-  g_number: string
 }
 
-interface RegionStat {
-  region: string
-  sales: number
-  revenue: number
-  cancellations: number
+interface ProductInfo {
+  brand: string
+  category: string
+  supplierArticle: string
+  techSize: string
+  barcode: string
+}
+
+interface DailyMetrics {
+  [date: string]: {
+    sales: number
+    revenue: number
+    cancellations: number
+    avgDiscount: number
+  }
+}
+
+interface MetricTableRow {
+  metric: string
+  [date: string]: string | number
 }
 
 const route = useRoute()
 
-// Используем композабл для фильтров с переименованными методами
-const { filters, applyFilters: applyFiltersComposable, resetFilters: resetFiltersComposable } = useFilters({
-  status: 'all'
-})
-
-const loading = ref<boolean>(false)
+const loading = ref(false)
 const orders = ref<Order[]>([])
-const currentPage = ref<number>(1)
-const pageSize = ref<number>(20)
 
-const dateFrom = ref<string>(filters.value.dateFrom as string)
-const dateTo = ref<string>(filters.value.dateTo as string)
+const dateState = reactive({
+  dateFrom: getWeekAgo(),
+  dateTo: getToday()
+})
 
 // Computed
 const articleId = computed(() => route.params.id as string)
 
-const filteredData = computed(() => {
-  return orders.value.filter(order => {
-    if (filters.value.region && order.oblast !== filters.value.region) return false
-    if (filters.value.category && order.category !== filters.value.category) return false
-    if (filters.value.brand && order.brand !== filters.value.brand) return false
-    if (filters.value.status === 'success' && order.is_cancel) return false
-    if (filters.value.status === 'cancelled' && !order.is_cancel) return false
-    return true
-  })
-})
-
-const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredData.value.slice(start, end)
+const productInfo = computed<ProductInfo>(() => {
+  if (orders.value.length === 0) {
+    return {
+      brand: '',
+      category: '',
+      supplierArticle: '',
+      techSize: '',
+      barcode: ''
+    }
+  }
+  
+  const firstOrder = orders.value[0]
+  return {
+    brand: firstOrder.brand || '',
+    category: firstOrder.category || '',
+    supplierArticle: firstOrder.supplier_article || '',
+    techSize: firstOrder.tech_size || '',
+    barcode: firstOrder.barcode || ''
+  }
 })
 
 const totalSales = computed(() => {
-  return filteredData.value.filter(order => !order.is_cancel).length
+  return orders.value.filter(order => !order.is_cancel).length
 })
 
 const totalRevenue = computed(() => {
-  return filteredData.value
+  return orders.value
     .filter(order => !order.is_cancel)
     .reduce((sum, order) => sum + parseFloat(order.total_price || '0'), 0)
 })
 
 const totalCancellations = computed(() => {
-  return filteredData.value.filter(order => order.is_cancel).length
+  return orders.value.filter(order => order.is_cancel).length
 })
 
 const avgDiscount = computed(() => {
-  const ordersWithDiscount = filteredData.value
+  const ordersWithDiscount = orders.value
     .filter(order => !order.is_cancel && order.discount_percent > 0)
   return ordersWithDiscount.length > 0
     ? Math.round(ordersWithDiscount.reduce((sum, order) => sum + order.discount_percent, 0) / ordersWithDiscount.length * 10) / 10
     : 0
 })
 
-const uniqueRegions = computed(() => {
-  return [...new Set(orders.value.map(item => item.oblast || '').filter(Boolean))].sort()
-})
-
-const uniqueCategories = computed(() => {
-  return [...new Set(orders.value.map(item => item.category || '').filter(Boolean))].sort()
-})
-
-const uniqueBrands = computed(() => {
-  return [...new Set(orders.value.map(item => item.brand || '').filter(Boolean))].sort()
-})
-
-const salesChartLabels = computed(() => {
-  const dates = [...new Set(filteredData.value.map(item => item.date.split(' ')[0]))].sort()
-  return dates.map(date => {
-    const d = new Date(date)
-    return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}`
-  })
-})
-
-const salesChartValues = computed(() => {
-  const dates = [...new Set(filteredData.value.map(item => item.date.split(' ')[0]))].sort()
-  return dates.map(date => {
-    return filteredData.value
-      .filter(item => item.date.split(' ')[0] === date && !item.is_cancel)
-      .length
-  })
-})
-
-const revenueChartLabels = computed(() => salesChartLabels.value)
-
-const revenueChartValues = computed(() => {
-  const dates = [...new Set(filteredData.value.map(item => item.date.split(' ')[0]))].sort()
-  return dates.map(date => {
-    return filteredData.value
-      .filter(item => item.date.split(' ')[0] === date && !item.is_cancel)
-      .reduce((sum, item) => sum + parseFloat(item.total_price || '0'), 0)
-  })
-})
-
-const regionStats = computed(() => {
-  const regions = [...new Set(filteredData.value.map(item => item.oblast || '').filter(Boolean))]
+const dailyMetrics = computed<DailyMetrics>(() => {
+  const metrics: DailyMetrics = {}
+  const dates = getDatesInRange(dateState.dateFrom, dateState.dateTo)
   
-  return regions.map(region => {
-    const regionOrders = filteredData.value.filter(order => order.oblast === region)
-    const successfulOrders = regionOrders.filter(order => !order.is_cancel)
-    
-    return {
-      region,
-      sales: successfulOrders.length,
-      revenue: successfulOrders.reduce((sum, order) => sum + parseFloat(order.total_price || '0'), 0),
-      cancellations: regionOrders.filter(order => order.is_cancel).length
+  dates.forEach(date => {
+    metrics[date] = {
+      sales: 0,
+      revenue: 0,
+      cancellations: 0,
+      avgDiscount: 0
     }
-  }).sort((a, b) => b.revenue - a.revenue)
+  })
+  
+  orders.value.forEach(order => {
+    const date = order.date.split(' ')[0]
+    if (metrics[date]) {
+      if (!order.is_cancel) {
+        metrics[date].sales++
+        metrics[date].revenue += parseFloat(order.total_price || '0')
+        
+        if (order.discount_percent > 0) {
+          const current = metrics[date]
+          current.avgDiscount = current.avgDiscount === 0 ? 
+            order.discount_percent : 
+            (current.avgDiscount + order.discount_percent) / 2
+        }
+      } else {
+        metrics[date].cancellations++
+      }
+    }
+  })
+  
+  return metrics
+})
+
+const tableDates = computed(() => {
+  return getDatesInRange(dateState.dateFrom, dateState.dateTo)
+})
+
+const metricsTableData = computed<MetricTableRow[]>(() => {
+  const metrics = dailyMetrics.value
+  const dates = tableDates.value
+  
+  return [
+    {
+      metric: 'Количество продаж',
+      ...Object.fromEntries(dates.map(date => [date, metrics[date]?.sales || 0]))
+    },
+    {
+      metric: 'Выручка',
+      ...Object.fromEntries(dates.map(date => [date, metrics[date]?.revenue || 0]))
+    },
+    {
+      metric: 'Количество отмен',
+      ...Object.fromEntries(dates.map(date => [date, metrics[date]?.cancellations || 0]))
+    },
+    {
+      metric: 'Средняя скидка',
+      ...Object.fromEntries(dates.map(date => [date, metrics[date]?.avgDiscount || 0]))
+    }
+  ]
 })
 
 // Methods
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('ru-RU')
+const formatTableDate = (dateString: string) => {
+  const date = new Date(dateString)
+  return `${date.getDate().toString().padStart(2, '0')}.${(date.getMonth() + 1).toString().padStart(2, '0')}`
 }
 
-const applyPageFilters = () => {
-  currentPage.value = 1
+const formatMetricValue = (metric: string, value: number) => {
+  if (metric === 'Выручка') {
+    return `${Math.round(value).toLocaleString('ru-RU')} ₽`
+  } else if (metric === 'Средняя скидка') {
+    return value > 0 ? `${value.toFixed(1)}%` : '0%'
+  } else {
+    return value.toString()
+  }
 }
 
-const resetPageFilters = () => {
-  const currentDateFrom = filters.value.dateFrom
-  const currentDateTo = filters.value.dateTo
+function getDatesInRange(startDate: string, endDate: string): string[] {
+  const dates: string[] = []
+  const currentDate = new Date(startDate)
+  const end = new Date(endDate)
   
-  resetFiltersComposable({
-    dateFrom: currentDateFrom,
-    dateTo: currentDateTo,
-    region: '',
-    category: '',
-    brand: '',
-    status: 'all'
-  })
+  while (currentDate <= end) {
+    dates.push(currentDate.toISOString().split('T')[0])
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
   
-  currentPage.value = 1
+  return dates
 }
 
-const exportData = () => {
-  ElMessage.info('Функция экспорта в разработке')
+function getToday() {
+  const today = new Date()
+  return today.toISOString().split('T')[0]
+}
+
+function getWeekAgo() {
+  const weekAgo = new Date()
+  weekAgo.setDate(weekAgo.getDate() - 7)
+  return weekAgo.toISOString().split('T')[0]
 }
 
 async function loadData() {
+  if (!dateState.dateFrom || !dateState.dateTo) {
+    ElMessage.warning('Выберите период')
+    return
+  }
+  
+  if (dateState.dateFrom > dateState.dateTo) {
+    ElMessage.warning('Дата "с" не может быть больше даты "по"')
+    return
+  }
+  
   loading.value = true
   try {
     const params: any = {
-      dateFrom: dateFrom.value,
-      dateTo: dateTo.value,
+      dateFrom: dateState.dateFrom,
+      dateTo: dateState.dateTo,
       key: "E6kUTYrYwZq2tN4QEtyzsbEBk3ie",
       limit: 500
     }
@@ -442,115 +389,170 @@ async function loadData() {
   }
 }
 
-watch(() => filters.value.dateFrom, (newVal: string) => {
-  dateFrom.value = newVal
-})
-
-watch(() => filters.value.dateTo, (newVal: string) => {
-  dateTo.value = newVal
-})
-
 // Lifecycle
 onMounted(() => {
-  if (!dateFrom.value || !dateTo.value) {
-    const defaultDates = getDefaultDates()
-    dateFrom.value = defaultDates.currentFrom
-    dateTo.value = defaultDates.currentTo
-    filters.value.dateFrom = defaultDates.currentFrom
-    filters.value.dateTo = defaultDates.currentTo
-  }
-  
   loadData()
 })
-
-watch([dateFrom, dateTo], () => {
-  currentPage.value = 1
-  loadData()
-})
-
-function getToday() {
-  const today = new Date()
-  return today.toISOString().split('T')[0]
-}
-
-function getWeekAgo() {
-  const weekAgo = new Date()
-  weekAgo.setDate(weekAgo.getDate() - 7)
-  return weekAgo.toISOString().split('T')[0]
-}
-
-function getDefaultDates() {
-  const today = new Date()
-  const currentTo = today.toISOString().split('T')[0]
-  
-  const currentFrom = new Date(today)
-  currentFrom.setDate(today.getDate() - 7)
-  const currentFromStr = currentFrom.toISOString().split('T')[0]
-  
-  return {
-    currentFrom: currentFromStr,
-    currentTo: currentTo
-  }
-}
 </script>
 
 <style scoped>
 .article-page {
-  padding: 20px;
+  padding: 20px 0px;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.article-id {
-  font-family: 'Courier New', monospace;
-  color: #409EFF;
-  background-color: #f0f9ff;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.metrics-grid {
+.article-layout {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+  align-items: start;
 }
 
-.metric-item {
+.article-sidebar {
+  position: sticky;
+  top: 20px;
+}
+
+.article-content {
+  display: grid;
+}
+
+.product-card {
+  height: fit-content;
+}
+
+.product-image {
+  width: 100%;
+  height: 250px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  gap: 12px;
+}
+
+.placeholder-text {
+  font-size: 14px;
+}
+
+.product-title {
+  margin: 0 0 20px 0;
+  color: #303133;
+  font-size: 20px;
+  font-weight: 600;
   text-align: center;
-  padding: 20px;
 }
 
-.metric-value {
-  font-size: 24px;
+.info-section {
+  margin-bottom: 24px;
+}
+
+.info-section h3 {
+  margin: 0 0 12px 0;
+  color: #606266;
+  font-size: 16px;
+  font-weight: 600;
+  border-bottom: 1px solid #e4e7ed;
+  padding-bottom: 8px;
+}
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.info-label {
+  color: #909399;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 120px;
+}
+
+.info-value {
+  color: #303133;
+  font-size: 14px;
+  text-align: right;
+  word-break: break-word;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.stat-value {
+  font-size: 16px;
   font-weight: 700;
   color: #303133;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
-.metric-label {
-  font-size: 14px;
+.stat-label {
+  font-size: 12px;
   color: #909399;
 }
 
-.charts-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+.metric-name {
+  font-weight: 600;
+  color: #303133;
+}
+
+.metric-value {
+  font-weight: 500;
+  color: #409EFF;
 }
 
 @media (max-width: 1200px) {
-  .metrics-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .article-layout {
+    grid-template-columns: 1fr;
   }
   
-  .charts-grid {
-    grid-template-columns: 1fr;
+  .article-sidebar {
+    position: static;
   }
 }
 
 @media (max-width: 768px) {
-  .metrics-grid {
+  .stats-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .info-item {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .info-label,
+  .info-value {
+    text-align: left;
   }
 }
 </style>

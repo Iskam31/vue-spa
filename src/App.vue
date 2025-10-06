@@ -76,8 +76,4 @@ header {
     text-align: center;
   }
 }
-
-main {
-  padding: 20px;
-}
 </style>

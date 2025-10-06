@@ -1,6 +1,5 @@
 <template>
   <div class="main-page">
-    <!-- Фильтры периода -->
     <el-card style="margin-bottom: 20px;">
       <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
         <div>
@@ -55,7 +54,6 @@
         </el-button>
       </div>
       
-      <!-- Показать активные фильтры -->
       <div v-if="activeFiltersCount > 0" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0;">
         <div style="font-size: 12px; color: #909399;">
           Активные фильтры: {{ activeFiltersCount }}
@@ -73,7 +71,6 @@
       </div>
     </el-card>
 
-    <!-- Метрики -->
     <div class="metrics-grid">
       <MetricCard
         title="Количество продаж"
@@ -120,7 +117,6 @@
       />
     </div>
 
-    <!-- Таблицы с топом артикулов -->
     <div class="tables-grid">
       <TopArticlesTable
         title="Топ артикулов по продажам"
@@ -157,7 +153,7 @@
 import { ref, computed, onMounted, watch, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import client, { fetchAllPages } from '@/api/client'
+import { fetchAllPages } from '@/api/client'
 import type { GenericRecord } from '@/types/api'
 import MetricCard from '@/components/MetricCard.vue'
 import TopArticlesTable from '@/components/TopArticlesTable.vue'
@@ -211,16 +207,13 @@ interface ArticleChange {
 const router = useRouter()
 const loading = ref(false)
 
-// Используем композабл для фильтров с переименованными методами
 const { 
   filters: pageFilters, 
-  applyFilters: applyFiltersComposable, 
   resetFilters: resetFiltersComposable 
 } = useFilters({
   status: 'all'
 })
 
-// Используем reactive для дат чтобы обеспечить реактивность
 const dateState = reactive({
   currentDateFrom: pageFilters.value.dateFrom || '',
   currentDateTo: pageFilters.value.dateTo || '',
@@ -231,7 +224,6 @@ const dateState = reactive({
 const currentPeriodData = ref<PeriodData>(createEmptyPeriodData())
 const previousPeriodData = ref<PeriodData>(createEmptyPeriodData())
 
-// Navigation methods
 const goToMetricPage = (metricType: string) => {
   router.push({
     path: `/metric/${metricType}`,
@@ -258,7 +250,7 @@ const goToArticleDetail = (article: ArticleChange) => {
   })
 }
 
-// Computed свойства
+// Computed
 const metrics = computed(() => {
   const current = currentPeriodData.value
   const previous = previousPeriodData.value
@@ -327,7 +319,6 @@ const topRevenueChanges = computed(() => calculateTopChanges('revenue'))
 const topCancellationChanges = computed(() => calculateTopChanges('cancellations'))
 const topDiscountChanges = computed(() => calculateTopChanges('avgDiscount'))
 
-// Computed для активных фильтров
 const activeFilters = computed(() => {
   const active: Array<{ key: string; label: string; value: string }> = []
   
@@ -355,6 +346,24 @@ const activeFilters = computed(() => {
 const activeFiltersCount = computed(() => activeFilters.value.length)
 
 // Methods
+function calculatePreviousPeriod(currentFrom: string, currentTo: string) {
+  const currentFromDate = new Date(currentFrom)
+  const currentToDate = new Date(currentTo)
+  
+  const periodDuration = Math.floor((currentToDate.getTime() - currentFromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  
+  const previousToDate = new Date(currentFromDate)
+  previousToDate.setDate(previousToDate.getDate() - 1)
+  
+  const previousFromDate = new Date(previousToDate)
+  previousFromDate.setDate(previousFromDate.getDate() - periodDuration + 1)
+  
+  return {
+    previousFrom: previousFromDate.toISOString().split('T')[0],
+    previousTo: previousToDate.toISOString().split('T')[0]
+  }
+}
+
 function createEmptyPeriodData(): PeriodData {
   return {
     salesCount: 0,
@@ -400,7 +409,9 @@ function resetToDefaultPeriod() {
   
   resetFiltersComposable({
     dateFrom: dates.currentFrom,
-    dateTo: dates.currentTo
+    dateTo: dates.currentTo,
+    previousFrom: dates.previousFrom,
+    previousTo: dates.previousTo,
   })
   
   loadData()
@@ -562,7 +573,6 @@ async function loadData() {
   }
 }
 
-// Методы для управления фильтрами
 const clearFilter = (filterKey: string) => {
   pageFilters.value[filterKey] = filterKey === 'status' ? 'all' : ''
 }
@@ -574,7 +584,6 @@ const clearAllPageFilters = () => {
   })
 }
 
-// Следим за изменениями дат и сохраняем в фильтры
 watch(() => [dateState.currentDateFrom, dateState.currentDateTo], () => {
   pageFilters.value.dateFrom = dateState.currentDateFrom
   pageFilters.value.dateTo = dateState.currentDateTo
@@ -582,10 +591,14 @@ watch(() => [dateState.currentDateFrom, dateState.currentDateTo], () => {
 
 // Lifecycle
 onMounted(() => {
-  // Если даты не установлены, устанавливаем по умолчанию
   if (!dateState.currentDateFrom || !dateState.currentDateTo) {
     resetToDefaultPeriod()
   } else {
+    if (!dateState.previousDateFrom || !dateState.previousDateTo) {
+      const previousPeriod = calculatePreviousPeriod(dateState.currentDateFrom, dateState.currentDateTo)
+      dateState.previousDateFrom = previousPeriod.previousFrom
+      dateState.previousDateTo = previousPeriod.previousTo
+    }
     loadData()
   }
 })
@@ -593,7 +606,7 @@ onMounted(() => {
 
 <style scoped>
 .main-page {
-  padding: 20px;
+  padding: 20px 0px;
   max-width: 1400px;
   margin: 0 auto;
 }

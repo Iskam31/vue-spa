@@ -13,14 +13,10 @@
           <el-button @click="$router.back()">
             ← Назад
           </el-button>
-          <el-button type="primary" @click="exportData">
-            Экспорт
-          </el-button>
         </div>
       </div>
     </el-card>
 
-    <!-- Фильтры -->
     <el-card style="margin-bottom: 20px;">
       <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
         <div>
@@ -89,7 +85,6 @@
       </div>
     </el-card>
 
-    <!-- График -->
     <el-card style="margin-bottom: 20px;">
       <template #header>
         <span style="font-weight: 600;">Динамика {{ metricTitle }}</span>
@@ -102,7 +97,6 @@
       />
     </el-card>
 
-    <!-- Таблица -->
     <el-card>
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -170,7 +164,6 @@
         </el-table-column>
       </el-table>
 
-      <!-- Пагинация -->
       <div style="display: flex; justify-content: center; margin-top: 20px;">
         <el-pagination
           v-model:current-page="currentPage"
@@ -209,7 +202,6 @@ interface Order extends GenericRecord {
 const route = useRoute()
 const router = useRouter()
 
-// Используем композабл для фильтров с переименованными методами
 const { 
   filters: pageFilters, 
   applyFilters: applyFiltersComposable, 
@@ -218,13 +210,11 @@ const {
   status: 'all'
 })
 
-// Reactive data
 const loading = ref(false)
 const orders = ref<Order[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 
-// Используем reactive для дат чтобы избежать проблем с ref
 const dateState = {
   dateFrom: pageFilters.value.dateFrom,
   dateTo: pageFilters.value.dateTo
@@ -317,14 +307,12 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('ru-RU')
 }
 
-// Переименовываем методы чтобы избежать конфликта имен
 const applyPageFilters = () => {
   currentPage.value = 1
   loadData()
 }
 
 const resetPageFilters = () => {
-  // Сбрасываем только фильтры кроме дат
   const currentDateFrom = pageFilters.value.dateFrom
   const currentDateTo = pageFilters.value.dateTo
   
@@ -355,10 +343,6 @@ const goToArticleDetail = (order: Order) => {
   })
 }
 
-const exportData = () => {
-  ElMessage.info('Функция экспорта в разработке')
-}
-
 async function loadData() {
   loading.value = true
   try {
@@ -381,7 +365,6 @@ async function loadData() {
   }
 }
 
-// Следим за изменениями дат в фильтрах
 watch(() => pageFilters.value.dateFrom, (newVal: string) => {
   dateState.dateFrom = newVal
 })
@@ -392,7 +375,6 @@ watch(() => pageFilters.value.dateTo, (newVal: string) => {
 
 // Lifecycle
 onMounted(() => {
-  // Устанавливаем даты из фильтров или по умолчанию
   if (!dateState.dateFrom || !dateState.dateTo) {
     const defaultDates = getDefaultDates()
     dateState.dateFrom = defaultDates.currentFrom
@@ -404,7 +386,6 @@ onMounted(() => {
   loadData()
 })
 
-// Загружаем данные при изменении дат
 watch([() => dateState.dateFrom, () => dateState.dateTo], () => {
   currentPage.value = 1
   loadData()
@@ -427,7 +408,7 @@ function getDefaultDates() {
 
 <style scoped>
 .metric-page {
-  padding: 20px;
+  padding: 20px 0px;
   max-width: 1400px;
   margin: 0 auto;
 }

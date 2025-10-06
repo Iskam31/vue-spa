@@ -58,7 +58,6 @@ import LineChart from '@/components/LineChart.vue'
 import type { GenericRecord } from '@/types/api'
 import { ElMessage } from 'element-plus'
 
-// Функция для получения сегодняшней даты в формате YYYY-MM-DD
 const getToday = () => {
     const today = new Date()
     return today.toISOString().split('T')[0]
