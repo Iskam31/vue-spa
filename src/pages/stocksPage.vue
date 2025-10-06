@@ -10,6 +10,7 @@
                         placeholder="Выберите дату"
                         format="YYYY-MM-DD"
                         value-format="YYYY-MM-DD"
+                        :disabled="true"
                     />
                 </div>
                 <div>
@@ -81,7 +82,7 @@ const fields = ref<string[]>([])
 const chartField = ref<string | null>(null)
 
 const dateTo = ref<string>(getToday())
-const dateFrom = ref<string>(getWeekAgo())
+const dateFrom = dateTo
 
 onMounted(() => {
     fetchData()
