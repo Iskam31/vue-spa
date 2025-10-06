@@ -63,6 +63,12 @@ const getToday = () => {
     return today.toISOString().split('T')[0]
 }
 
+const getWeekAgo = () => {
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    return weekAgo.toISOString().split('T')[0]
+}
+
 
 const rows = ref<GenericRecord[]>([])
 const loading = ref(false)
@@ -74,9 +80,8 @@ const filters = ref({ q: '', field: '' as string | null })
 const fields = ref<string[]>([])
 const chartField = ref<string | null>(null)
 
-// Даты по умолчанию - с сегодняшней
 const dateTo = ref<string>(getToday())
-const dateFrom = dateTo
+const dateFrom = ref<string>(getWeekAgo())
 
 onMounted(() => {
     fetchData()
