@@ -1,7 +1,8 @@
 <template>
   <div class="main-page">
     <el-card style="margin-bottom: 20px;">
-      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+      <!-- Периоды -->
+      <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap; margin-bottom: 15px;">
         <div>
           <span style="margin-right: 8px;">Текущий период с:</span>
           <el-date-picker
@@ -48,22 +49,72 @@
         <el-button @click="resetToDefaultPeriod" :disabled="loading">
           Сбросить к неделе
         </el-button>
+      </div>
+
+      <!-- Фильтры -->
+      <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; padding-top: 15px; border-top: 1px solid #f0f0f0;">
+        <el-select v-model="pageFilters.article" placeholder="Артикул" clearable style="width: 150px;">
+          <el-option
+            v-for="article in uniqueArticles"
+            :key="article"
+            :label="article"
+            :value="article"
+          />
+        </el-select>
         
-        <el-button @click="clearAllPageFilters" type="warning" plain>
-          Очистить все фильтры
+        <el-select v-model="pageFilters.region" placeholder="Регион" clearable style="width: 180px;">
+          <el-option
+            v-for="region in uniqueRegions"
+            :key="region"
+            :label="region"
+            :value="region"
+          />
+        </el-select>
+        
+        <el-select v-model="pageFilters.category" placeholder="Категория" clearable style="width: 180px;">
+          <el-option
+            v-for="category in uniqueCategories"
+            :key="category"
+            :label="category"
+            :value="category"
+          />
+        </el-select>
+        
+        <el-select v-model="pageFilters.brand" placeholder="Бренд" clearable style="width: 150px;">
+          <el-option
+            v-for="brand in uniqueBrands"
+            :key="brand"
+            :label="brand"
+            :value="brand"
+          />
+        </el-select>
+
+        <el-select v-model="pageFilters.status" placeholder="Статус" clearable style="width: 130px;">
+          <el-option label="Все" value="all" />
+          <el-option label="Успешно" value="success" />
+          <el-option label="Отмена" value="cancel" />
+        </el-select>
+        
+        <el-button type="primary" @click="applyPageFilters">
+          Применить фильтры
+        </el-button>
+        <el-button @click="resetPageFilters">
+          Сбросить фильтры
         </el-button>
       </div>
       
-      <div v-if="activeFiltersCount > 0" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0;">
-        <div style="font-size: 12px; color: #909399;">
+      <div v-if="activeFiltersCount > 0" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f0f0f0;">
+        <div style="font-size: 12px; color: #909399; margin-bottom: 8px;">
           Активные фильтры: {{ activeFiltersCount }}
+        </div>
+        <div>
           <el-tag
             v-for="filter in activeFilters"
             :key="filter.key"
             size="small"
             closable
             @close="clearFilter(filter.key)"
-            style="margin-left: 8px;"
+            style="margin-right: 8px; margin-bottom: 4px;"
           >
             {{ filter.label }}: {{ filter.value }}
           </el-tag>
@@ -223,34 +274,25 @@ const dateState = reactive({
 
 const currentPeriodData = ref<PeriodData>(createEmptyPeriodData())
 const previousPeriodData = ref<PeriodData>(createEmptyPeriodData())
-
-const goToMetricPage = (metricType: string) => {
-  router.push({
-    path: `/metric/${metricType}`,
-    query: {
-      dateFrom: dateState.currentDateFrom,
-      dateTo: dateState.currentDateTo,
-      region: pageFilters.value.region,
-      category: pageFilters.value.category,
-      brand: pageFilters.value.brand
-    }
-  })
-}
-
-const goToArticleDetail = (article: ArticleChange) => {
-  router.push({
-    path: `/article/${article.nm_id}`,
-    query: {
-      dateFrom: dateState.currentDateFrom,
-      dateTo: dateState.currentDateTo,
-      region: pageFilters.value.region,
-      category: pageFilters.value.category,
-      brand: pageFilters.value.brand
-    }
-  })
-}
+const allOrders = ref<Order[]>([])
 
 // Computed
+const uniqueArticles = computed(() => {
+  return [...new Set(allOrders.value.map(item => item.nm_id.toString()))].sort()
+})
+
+const uniqueRegions = computed(() => {
+  return [...new Set(allOrders.value.map(item => item.oblast || '').filter(Boolean))].sort()
+})
+
+const uniqueCategories = computed(() => {
+  return [...new Set(allOrders.value.map(item => item.category || '').filter(Boolean))].sort()
+})
+
+const uniqueBrands = computed(() => {
+  return [...new Set(allOrders.value.map(item => item.brand || '').filter(Boolean))].sort()
+})
+
 const metrics = computed(() => {
   const current = currentPeriodData.value
   const previous = previousPeriodData.value
@@ -435,7 +477,18 @@ async function fetchOrdersForPeriod(dateFrom: string, dateTo: string, periodName
 function processOrders(orders: Order[]): PeriodData {
   const data = createEmptyPeriodData()
   
-  orders.forEach(order => {
+  // Применяем фильтры к заказам
+  const filteredOrders = orders.filter(order => {
+    if (pageFilters.value.article && order.nm_id.toString() !== pageFilters.value.article) return false
+    if (pageFilters.value.region && order.oblast !== pageFilters.value.region) return false
+    if (pageFilters.value.category && order.category !== pageFilters.value.category) return false
+    if (pageFilters.value.brand && order.brand !== pageFilters.value.brand) return false
+    if (pageFilters.value.status === 'success' && order.is_cancel) return false
+    if (pageFilters.value.status === 'cancel' && !order.is_cancel) return false
+    return true
+  })
+  
+  filteredOrders.forEach(order => {
     const date = order.date.split(' ')[0]
     const nmId = order.nm_id
     const totalPrice = parseFloat(order.total_price || '0')
@@ -561,6 +614,9 @@ async function loadData() {
       fetchOrdersForPeriod(dateState.previousDateFrom, dateState.previousDateTo, 'предыдущий')
     ])
     
+    // Сохраняем все заказы для фильтров
+    allOrders.value = [...currentOrders, ...previousOrders]
+    
     currentPeriodData.value = processOrders(currentOrders)
     previousPeriodData.value = processOrders(previousOrders)
     
@@ -573,14 +629,61 @@ async function loadData() {
   }
 }
 
+const applyPageFilters = () => {
+  loadData()
+}
+
+const resetPageFilters = () => {
+  const currentDateFrom = pageFilters.value.dateFrom
+  const currentDateTo = pageFilters.value.dateTo
+  
+  resetFiltersComposable({
+    dateFrom: currentDateFrom,
+    dateTo: currentDateTo,
+    article: '',
+    region: '',
+    category: '',
+    brand: '',
+    status: 'all'
+  })
+  
+  loadData()
+}
+
 const clearFilter = (filterKey: string) => {
   pageFilters.value[filterKey] = filterKey === 'status' ? 'all' : ''
+  loadData()
 }
 
 const clearAllPageFilters = () => {
-  resetFiltersComposable({
-    dateFrom: pageFilters.value.dateFrom,
-    dateTo: pageFilters.value.dateTo
+  resetPageFilters()
+}
+
+const goToMetricPage = (metricType: string) => {
+  router.push({
+    path: `/metric/${metricType}`,
+    query: {
+      dateFrom: dateState.currentDateFrom,
+      dateTo: dateState.currentDateTo,
+      region: pageFilters.value.region,
+      category: pageFilters.value.category,
+      brand: pageFilters.value.brand,
+      status: pageFilters.value.status
+    }
+  })
+}
+
+const goToArticleDetail = (article: ArticleChange) => {
+  router.push({
+    path: `/article/${article.nm_id}`,
+    query: {
+      dateFrom: dateState.currentDateFrom,
+      dateTo: dateState.currentDateTo,
+      region: pageFilters.value.region,
+      category: pageFilters.value.category,
+      brand: pageFilters.value.brand,
+      status: pageFilters.value.status
+    }
   })
 }
 

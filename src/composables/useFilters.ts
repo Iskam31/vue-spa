@@ -16,7 +16,6 @@ export function useFilters(defaultFilters: Partial<FilterState> = {}) {
   const route = useRoute()
   const router = useRouter()
   
-  // Инициализируем фильтры из query параметров или localStorage
   const filters = ref<FilterState>({
     dateFrom: '',
     dateTo: '',
@@ -28,7 +27,11 @@ export function useFilters(defaultFilters: Partial<FilterState> = {}) {
     ...defaultFilters
   })
 
-  // Загружаем фильтры из query параметров при инициализации
+  // Простой ключ на основе пути страницы
+  const getStorageKey = () => {
+    return `filters-${route.path}`
+  }
+
   const loadFiltersFromQuery = () => {
     Object.keys(filters.value).forEach(key => {
       if (route.query[key]) {
@@ -37,9 +40,9 @@ export function useFilters(defaultFilters: Partial<FilterState> = {}) {
     })
   }
 
-  // Загружаем фильтры из localStorage
   const loadFiltersFromStorage = () => {
-    const savedFilters = localStorage.getItem('app-filters')
+    const storageKey = getStorageKey()
+    const savedFilters = localStorage.getItem(storageKey)
     if (savedFilters) {
       try {
         const parsed = JSON.parse(savedFilters)
@@ -54,7 +57,6 @@ export function useFilters(defaultFilters: Partial<FilterState> = {}) {
     }
   }
 
-  // Сохраняем фильтры в query параметры
   const saveFiltersToQuery = () => {
     const query: Record<string, string> = {}
     
@@ -64,37 +66,31 @@ export function useFilters(defaultFilters: Partial<FilterState> = {}) {
       }
     })
 
-    // Сохраняем текущий путь чтобы не сбрасывать страницу
-    const currentPath = route.path
-    
     router.replace({
-      path: currentPath,
+      path: route.path,
       query: { ...route.query, ...query }
     })
   }
 
-  // Сохраняем фильтры в localStorage
   const saveFiltersToStorage = () => {
     try {
-      localStorage.setItem('app-filters', JSON.stringify(filters.value))
+      const storageKey = getStorageKey()
+      localStorage.setItem(storageKey, JSON.stringify(filters.value))
     } catch (e) {
       console.warn('Failed to save filters to localStorage', e)
     }
   }
 
-  // Инициализация
   const initializeFilters = () => {
     loadFiltersFromStorage()
     loadFiltersFromQuery()
   }
 
-  // Применяем фильтры (сохраняем в query и localStorage)
   const applyFilters = () => {
     saveFiltersToQuery()
     saveFiltersToStorage()
   }
 
-  // Сбрасываем фильтры к значениям по умолчанию
   const resetFilters = (newDefaults: Partial<FilterState> = {}) => {
     Object.keys(filters.value).forEach(key => {
       if (newDefaults[key] !== undefined) {
@@ -108,12 +104,10 @@ export function useFilters(defaultFilters: Partial<FilterState> = {}) {
     applyFilters()
   }
 
-  // Автоматически сохраняем фильтры при изменении
   watch(filters, () => {
     applyFilters()
   }, { deep: true, immediate: false })
 
-  // Инициализируем при создании
   initializeFilters()
 
   return {

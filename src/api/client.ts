@@ -58,7 +58,7 @@ export async function fetchAllPages<T>(
       const params = {
         ...baseParams,
         page: currentPage,
-        limit: 50,
+        limit: 500,
         key: "E6kUTYrYwZq2tN4QEtyzsbEBk3ie"
       }
 
@@ -97,7 +97,7 @@ export async function fetchSinglePage<T>(
   const requestParams = {
     ...params,
     key: "E6kUTYrYwZq2tN4QEtyzsbEBk3ie",
-    limit: 1000
+    limit: 500
   }
 
   try {
